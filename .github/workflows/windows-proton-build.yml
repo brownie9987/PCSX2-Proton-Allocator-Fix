@@ -65,14 +65,14 @@ jobs:
 
       - name: Build PCSX2 Windows Dependencies
         shell: cmd
-        working-directory: pcsx2
+        working-directory: C:\\p
         run: |
           call .github\workflows\scripts\windows\build-dependencies.bat deps
           if errorlevel 1 exit /b %errorlevel%
 
       - name: Configure
         shell: cmd
-        working-directory: pcsx2
+        working-directory: C:\\p
         run: |
           cmake -S . -B build -G Ninja ^
             -DCMAKE_BUILD_TYPE=Release ^
@@ -82,7 +82,7 @@ jobs:
 
       - name: Build
         shell: cmd
-        working-directory: pcsx2
+        working-directory: C:\\p
         run: |
           cmake --build build --config Release
           if errorlevel 1 exit /b %errorlevel%
@@ -90,23 +90,23 @@ jobs:
       - name: Collect executable
         shell: pwsh
         run: |
-          $exe = Get-ChildItem -Path build -Recurse -Filter pcsx2-qt.exe |
+          $exe = Get-ChildItem -Path C:\\p\\build -Recurse -Filter pcsx2-qt.exe |
             Select-Object -First 1
 
           if (-not $exe) {
             throw "pcsx2-qt.exe was not produced"
           }
 
-          New-Item -ItemType Directory -Force artifact | Out-Null
-          Copy-Item $exe.FullName artifact/pcsx2-qt.exe
+          New-Item -ItemType Directory -Force C:\\artifact | Out-Null
+          Copy-Item $exe.FullName C:\\artifact\\pcsx2-qt.exe
 
           Write-Host "Built executable:"
-          Get-Item artifact/pcsx2-qt.exe
-          Get-FileHash artifact/pcsx2-qt.exe -Algorithm SHA256
+          Get-Item C:\\artifact\\pcsx2-qt.exe
+          Get-FileHash C:\\artifact\\pcsx2-qt.exe -Algorithm SHA256
 
       - name: Upload patched executable
         uses: actions/upload-artifact@v4
         with:
           name: PCSX2-v2.9.53-Proton-Allocator-Fix
-          path: artifact/pcsx2-qt.exe
+          path: C:\\artifact\\pcsx2-qt.exe
           if-no-files-found: error
