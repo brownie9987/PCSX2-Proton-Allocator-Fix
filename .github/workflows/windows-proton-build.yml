@@ -93,26 +93,38 @@ jobs:
           cmake --build build --config Release
           if errorlevel 1 exit /b %errorlevel%
 
-      - name: Collect executable
+      - name: Collect complete PCSX2 package
         shell: pwsh
         run: |
-          $exe = Get-ChildItem -Path P:\\build -Recurse -Filter pcsx2-qt.exe |
+          $exe = Get-ChildItem -Path P:\build -Recurse -Filter pcsx2-qt.exe |
             Select-Object -First 1
 
           if (-not $exe) {
             throw "pcsx2-qt.exe was not produced"
           }
 
-          New-Item -ItemType Directory -Force C:\\artifact | Out-Null
-          Copy-Item $exe.FullName C:\\artifact\\pcsx2-qt.exe
+          $package = $exe.Directory.FullName
 
-          Write-Host "Built executable:"
-          Get-Item C:\\artifact\\pcsx2-qt.exe
-          Get-FileHash C:\\artifact\\pcsx2-qt.exe -Algorithm SHA256
+          Write-Host "PCSX2 package directory:"
+          Write-Host $package
+          Get-ChildItem $package | Select-Object Name, Length
+
+          if (-not (Test-Path (Join-Path $package "resources"))) {
+            throw "Matching resources directory was not produced beside pcsx2-qt.exe"
+          }
+
+          New-Item -ItemType Directory -Force C:\artifact | Out-Null
+          Copy-Item "$package\*" C:\artifact\ -Recurse -Force
+
+          Write-Host "Collected package:"
+          Get-ChildItem C:\artifact | Select-Object Name, Length
+
+          Write-Host "Patched executable hash:"
+          Get-FileHash C:\artifact\pcsx2-qt.exe -Algorithm SHA256
 
       - name: Upload patched executable
         uses: actions/upload-artifact@v4
         with:
-          name: PCSX2-v2.9.53-Proton-Allocator-Fix
-          path: C:\\artifact\\pcsx2-qt.exe
+          name: PCSX2-v2.9.53-Proton-Allocator-Fix-Full
+          path: C:\\artifact
           if-no-files-found: error
