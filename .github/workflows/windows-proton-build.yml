@@ -1,0 +1,98 @@
+name: PCSX2 v2.9.53 Proton Allocator Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2025
+
+    steps:
+      - name: Checkout official PCSX2 v2.9.53
+        shell: pwsh
+        run: |
+          git clone --branch v2.9.53 --depth 1 --recurse-submodules https://github.com/PCSX2/pcsx2.git pcsx2
+          cd pcsx2
+          git submodule update --init --recursive
+
+      - name: Apply Proton allocator fix
+        shell: pwsh
+        run: |
+          $path = "pcsx2/common/AlignedMalloc.h"
+          $text = [System.IO.File]::ReadAllText($path)
+
+          $old = @'
+          #else
+          #define pcsx2_aligned_realloc(handle, new_size, align, old_size) \
+          	_aligned_realloc(handle, new_size, align)
+          #endif
+          '@
+
+          $new = @'
+          #else
+          static inline void* pcsx2_aligned_realloc(void* handle, size_t new_size, size_t align, size_t old_size)
+          {
+          	void* newbuf = _aligned_malloc(new_size, align);
+          	if (newbuf != NULL && handle != NULL)
+          	{
+          		memcpy(newbuf, handle, std::min(old_size, new_size));
+          		_aligned_free(handle);
+          	}
+          	return newbuf;
+          }
+          #endif
+          '@
+
+          if (-not $text.Contains($old)) {
+            throw "Expected v2.9.53 allocator block not found"
+          }
+
+          $text = $text.Replace($old, $new)
+
+          if (-not $text.Contains("#include <algorithm>")) {
+            $text = $text.Replace(
+              "#pragma once",
+              "#pragma once`r`n`r`n#include <algorithm>`r`n#include <cstring>"
+            )
+          }
+
+          [System.IO.File]::WriteAllText($path, $text)
+
+          Write-Host "Allocator patch applied."
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -S pcsx2 -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPACKAGE_MODE=ON
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cmake --build build --config Release
+
+      - name: Collect executable
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path build -Recurse -Filter pcsx2-qt.exe |
+            Select-Object -First 1
+
+          if (-not $exe) {
+            throw "pcsx2-qt.exe was not produced"
+          }
+
+          New-Item -ItemType Directory -Force artifact | Out-Null
+          Copy-Item $exe.FullName artifact/pcsx2-qt.exe
+
+          Write-Host "Built executable:"
+          Get-Item artifact/pcsx2-qt.exe
+          Get-FileHash artifact/pcsx2-qt.exe -Algorithm SHA256
+
+      - name: Upload patched executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: PCSX2-v2.9.53-Proton-Allocator-Fix
+          path: artifact/pcsx2-qt.exe
+          if-no-files-found: error
