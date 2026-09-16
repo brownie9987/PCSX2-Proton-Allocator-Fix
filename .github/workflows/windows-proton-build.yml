@@ -11,7 +11,13 @@ jobs:
       - name: Checkout official PCSX2 v2.9.53
         shell: pwsh
         run: |
-          git clone --branch v2.9.53 --depth 1 --recurse-submodules https://github.com/PCSX2/pcsx2.git C:\p
+          git clone --branch v2.9.53 --depth 1 --recurse-submodules https://github.com/PCSX2/pcsx2.git pcsx2
+
+      - name: Create short build path
+        shell: cmd
+        run: |
+          subst P: "%GITHUB_WORKSPACE%\pcsx2"
+          dir P:\
           cd pcsx2
           git submodule update --init --recursive
 
@@ -65,14 +71,14 @@ jobs:
 
       - name: Build PCSX2 Windows Dependencies
         shell: cmd
-        working-directory: C:\\p
+        working-directory: P:\\
         run: |
           call .github\workflows\scripts\windows\build-dependencies.bat deps
           if errorlevel 1 exit /b %errorlevel%
 
       - name: Configure
         shell: cmd
-        working-directory: C:\\p
+        working-directory: P:\\
         run: |
           cmake -S . -B build -G Ninja ^
             -DCMAKE_BUILD_TYPE=Release ^
@@ -82,7 +88,7 @@ jobs:
 
       - name: Build
         shell: cmd
-        working-directory: C:\\p
+        working-directory: P:\\
         run: |
           cmake --build build --config Release
           if errorlevel 1 exit /b %errorlevel%
@@ -90,7 +96,7 @@ jobs:
       - name: Collect executable
         shell: pwsh
         run: |
-          $exe = Get-ChildItem -Path C:\\p\\build -Recurse -Filter pcsx2-qt.exe |
+          $exe = Get-ChildItem -Path P:\\build -Recurse -Filter pcsx2-qt.exe |
             Select-Object -First 1
 
           if (-not $exe) {
