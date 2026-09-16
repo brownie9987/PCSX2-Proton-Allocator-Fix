@@ -63,15 +63,29 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Configure
-        shell: pwsh
+      - name: Build PCSX2 Windows Dependencies
+        shell: cmd
+        working-directory: pcsx2
         run: |
-          cmake -S pcsx2 -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPACKAGE_MODE=ON
+          call .github\workflows\scripts\windows\build-dependencies.bat deps
+          if errorlevel 1 exit /b %errorlevel%
+
+      - name: Configure
+        shell: cmd
+        working-directory: pcsx2
+        run: |
+          cmake -S . -B build -G Ninja ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DPACKAGE_MODE=ON ^
+            "-DCMAKE_PREFIX_PATH=%cd%\deps"
+          if errorlevel 1 exit /b %errorlevel%
 
       - name: Build
-        shell: pwsh
+        shell: cmd
+        working-directory: pcsx2
         run: |
           cmake --build build --config Release
+          if errorlevel 1 exit /b %errorlevel%
 
       - name: Collect executable
         shell: pwsh
